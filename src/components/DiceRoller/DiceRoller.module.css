@@ -1,0 +1,64 @@
+.diceContainer {
+  position: relative;
+  overflow: hidden;
+  background: transparent;
+  /* Remove border for overlay effect */
+}
+
+.diceWrapper {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+.sceneContainer {
+  flex: 1;
+}
+
+.controlsPanel {
+  width: 350px;
+  background: #f5f5f5;
+  padding: 20px;
+  border-radius: 4px;
+  overflow-y: auto;
+  max-height: 600px;
+}
+
+.controlsSection {
+  margin-bottom: 20px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #ddd;
+}
+
+.controlsSection:last-child {
+  border-bottom: none;
+}
+
+.physicsControls {
+  margin-top: 20px;
+}
+
+.physicsSection {
+  margin-bottom: 15px;
+}
+
+.physicsSection h4 {
+  margin: 10px 0 5px 0;
+  color: #333;
+}
+
+.sliderControl {
+  margin-bottom: 8px;
+}
+
+.sliderControl label {
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+}
+
+.sliderControl span {
+  width: 120px;
+  text-align: right;
+  margin-right: 10px;
+}
