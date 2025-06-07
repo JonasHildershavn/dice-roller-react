@@ -1,4 +1,3 @@
-import React from 'react';
 import styles from './DiceRoller.module.css';
 import type { PhysicsParams, PhysicsControlsProps } from '../../types';
 import { DEFAULT_PHYSICS, PHYSICS_LIMITS, UI_CONFIG } from '../../constants';

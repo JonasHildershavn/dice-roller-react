@@ -8,10 +8,28 @@ import type * as CANNON from 'cannon-es';
 // ==================== Component Props ====================
 
 export interface DiceRollerProps {
-  width?: number;
-  height?: number;
-  dieSize?: number;
+  // Visual customization
+  diceColor?: string;         // Default: '#4a90e2'
+  numberColor?: string;       // Default: '#ffffff'
+  
+  // Die configuration
+  dieType?: DieType;          // Default: 'd6'
+  predeterminedResult?: number | null;     // Optional: force specific result
+  
+  // Size and display
+  width?: number;             // Default: 600
+  height?: number;            // Default: 400
+  dieSize?: number;           // Default: 1
+  
+  // Callbacks
   onResult?: (result: number) => void;
+  onRollStart?: () => void;
+  onRollEnd?: () => void;
+  
+  // Optional features
+  showControls?: boolean;     // Default: false - hide physics controls
+  showResultDisplay?: boolean; // Default: true - show last result
+  throwForce?: number;        // Default: 1.0 - multiplier for throw force
 }
 
 // ==================== Dice Types ====================

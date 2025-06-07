@@ -1,54 +1,116 @@
-# React + TypeScript + Vite
+# dice-roller-react
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A React 3D dice roller component with realistic physics simulation and predetermined results.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- 🎲 Multiple dice types: D6, D8, D20
+- 🎨 Customizable colors for dice and numbers
+- 🎯 Predetermined results - force specific outcomes
+- ⚡ Realistic physics with Three.js and Cannon-ES
+- 🎮 Optional physics controls panel
+- 📱 Responsive design
 
-## Expanding the ESLint configuration
+## Installation
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+Since this is a private GitHub repository, you can install it directly:
 
-```js
-export default tseslint.config({
-  extends: [
-    // Remove ...tseslint.configs.recommended and replace with this
-    ...tseslint.configs.recommendedTypeChecked,
-    // Alternatively, use this for stricter rules
-    ...tseslint.configs.strictTypeChecked,
-    // Optionally, add this for stylistic rules
-    ...tseslint.configs.stylisticTypeChecked,
-  ],
-  languageOptions: {
-    // other options...
-    parserOptions: {
-      project: ['./tsconfig.node.json', './tsconfig.app.json'],
-      tsconfigRootDir: import.meta.dirname,
-    },
-  },
-})
+```bash
+npm install github:JonasHildershavn/dice-roller-react
+# or
+pnpm add github:JonasHildershavn/dice-roller-react
+# or
+yarn add github:JonasHildershavn/dice-roller-react
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Basic Usage
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+```tsx
+import { DiceRoller } from 'dice-roller-react'
+import 'dice-roller-react/dist/style.css'
 
-export default tseslint.config({
-  plugins: {
-    // Add the react-x and react-dom plugins
-    'react-x': reactX,
-    'react-dom': reactDom,
-  },
-  rules: {
-    // other rules...
-    // Enable its recommended typescript rules
-    ...reactX.configs['recommended-typescript'].rules,
-    ...reactDom.configs.recommended.rules,
-  },
-})
+function App() {
+  const handleResult = (result: number) => {
+    console.log('Rolled:', result)
+  }
+
+  return (
+    <DiceRoller 
+      onResult={handleResult}
+    />
+  )
+}
 ```
+
+## Props
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `diceColor` | `string` | `'#4a90e2'` | Color of the dice body |
+| `numberColor` | `string` | `'#ffffff'` | Color of the numbers on dice |
+| `dieType` | `'d6' \| 'd8' \| 'd20'` | `'d6'` | Type of die to use |
+| `predeterminedResult` | `number \| null` | `null` | Force a specific result |
+| `width` | `number` | `600` | Width of the component |
+| `height` | `number` | `400` | Height of the component |
+| `dieSize` | `number` | `1` | Size multiplier for the die |
+| `onResult` | `(result: number) => void` | - | Callback when roll completes |
+| `onRollStart` | `() => void` | - | Callback when roll starts |
+| `onRollEnd` | `() => void` | - | Callback when roll ends |
+| `showControls` | `boolean` | `false` | Show physics controls panel |
+| `showResultDisplay` | `boolean` | `true` | Show result display overlay |
+| `throwForce` | `number` | `1.0` | Multiplier for throw force |
+
+## Advanced Example
+
+```tsx
+import { useState } from 'react'
+import { DiceRoller, DieType } from 'dice-roller-react'
+import 'dice-roller-react/dist/style.css'
+
+function DiceGame() {
+  const [targetNumber] = useState(20)
+  const [attempts, setAttempts] = useState(0)
+  
+  return (
+    <div>
+      <h2>Roll a Natural 20!</h2>
+      <p>Attempts: {attempts}</p>
+      
+      <DiceRoller
+        dieType="d20"
+        diceColor="#ff0000"
+        numberColor="#ffd700"
+        predeterminedResult={attempts > 5 ? 20 : null} // Help after 5 tries
+        onResult={(result) => {
+          setAttempts(a => a + 1)
+          if (result === 20) {
+            alert('Natural 20!')
+          }
+        }}
+        showControls={false}
+        throwForce={1.5}
+      />
+    </div>
+  )
+}
+```
+
+## Development
+
+```bash
+# Install dependencies
+pnpm install
+
+# Run demo app
+pnpm run dev
+
+# Build library
+pnpm run build:lib
+
+# Build everything
+pnpm run build
+```
+
+## License
+
+MIT

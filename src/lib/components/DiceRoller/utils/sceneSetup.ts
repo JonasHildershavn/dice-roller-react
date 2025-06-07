@@ -3,7 +3,7 @@
  */
 
 import * as THREE from 'three';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
+import { OrbitControls } from 'three-stdlib';
 import { SCENE_CONFIG, LIGHTING_CONFIG, TABLE_CONFIG, CONTROLS_CONFIG } from '../../../constants';
 
 /**
@@ -128,7 +128,7 @@ export function addWalls(scene: THREE.Scene): void {
 /**
  * Create and configure orbit controls
  */
-export function createControls(camera: THREE.Camera, renderer: THREE.WebGLRenderer): OrbitControls {
+export function createControls(camera: THREE.PerspectiveCamera, renderer: THREE.WebGLRenderer): OrbitControls {
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enablePan = CONTROLS_CONFIG.enablePan;
   controls.minDistance = CONTROLS_CONFIG.minDistance;

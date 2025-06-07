@@ -1,5 +1,5 @@
 // React
-import React, { useRef, useState, useEffect, useCallback } from "react";
+import { useRef, useState, useEffect, useCallback } from "react";
 
 // Three.js
 import * as THREE from "three";
@@ -38,10 +38,28 @@ import {
 import styles from "./DiceRoller.module.css";
 
 const DiceRoller: React.FC<DiceRollerProps> = ({
+  // Visual customization
+  diceColor = '#4a90e2',
+  numberColor = '#ffffff',
+  
+  // Die configuration
+  dieType: propDieType = 'd6',
+  predeterminedResult = null,
+  
+  // Size and display
   width = 600,
   height = 400,
   dieSize = 1,
+  
+  // Callbacks
   onResult,
+  onRollStart,
+  onRollEnd,
+  
+  // Optional features
+  showControls = false,
+  showResultDisplay = true,
+  throwForce: propThrowForce = 1.0,
 }) => {
   const mountRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
@@ -50,7 +68,7 @@ const DiceRoller: React.FC<DiceRollerProps> = ({
   const worldRef = useRef<CANNON.World | null>(null);
   const dieBodyRef = useRef<CANNON.Body | null>(null);
   const dieMeshRef = useRef<THREE.Mesh | null>(null);
-  const frameRef = useRef<number>();
+  const frameRef = useRef<number | undefined>(undefined);
   const controlsRef = useRef<any>(null); // OrbitControls type
   const materialsRef = useRef<THREE.Material[]>([]);
   const baseMaterialsRef = useRef<THREE.Material[]>([]);
@@ -58,17 +76,38 @@ const DiceRoller: React.FC<DiceRollerProps> = ({
   const diceMaterialRef = useRef<CANNON.Material | null>(null);
   
   const [lastResult, setLastResult] = useState<number | null>(null);
-  const [targetResult, setTargetResult] = useState<number | null>(null);
-  const [dieType, setDieType] = useState<DieType>('d6');
+  const [targetResult, setTargetResult] = useState<number | null>(predeterminedResult ?? null);
+  const [dieType, setDieType] = useState<DieType>(propDieType);
   const [isRolling, setIsRolling] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const [physicsParams, setPhysicsParams] = useState<PhysicsParams>(DEFAULT_PHYSICS);
   const [worldReady, setWorldReady] = useState(false);
-  const [throwForce, setThrowForce] = useState<number>(THROW_CONFIG.defaultForce);
-  const [diceColor, setDiceColor] = useState<string>('#4a90e2');
-  const [numberColor, setNumberColor] = useState<string>('#ffffff');
-  const stoppedFramesRef = useRef(0);
+  const [throwForce, setThrowForce] = useState<number>(propThrowForce);
+  const [internalDiceColor, setInternalDiceColor] = useState<string>(diceColor);
+  const [internalNumberColor, setInternalNumberColor] = useState<string>(numberColor);
+  const stoppedFramesRef = useRef<number>(0);
   const physicsParamsRef = useRef(physicsParams);
+  
+  // Sync props with internal state
+  useEffect(() => {
+    setTargetResult(predeterminedResult);
+  }, [predeterminedResult]);
+  
+  useEffect(() => {
+    setDieType(propDieType as DieType);
+  }, [propDieType]);
+  
+  useEffect(() => {
+    setThrowForce(propThrowForce);
+  }, [propThrowForce]);
+  
+  useEffect(() => {
+    setInternalDiceColor(diceColor);
+  }, [diceColor]);
+  
+  useEffect(() => {
+    setInternalNumberColor(numberColor);
+  }, [numberColor]);
   
   // Initialize scene
   const initScene = useCallback(() => {
@@ -122,19 +161,19 @@ const DiceRoller: React.FC<DiceRollerProps> = ({
     
     if (dieType === 'd6') {
       geometry = createD6Geometry(dieSize);
-      materials = createD6Materials(50, 0.9, diceColor, numberColor);
+      materials = createD6Materials(50, 0.9, internalDiceColor, internalNumberColor);
       baseMaterialsRef.current = [...materials];
       materialsRef.current = [...materials];
       currentFaceMappingRef.current = DICE_CONFIGS.d6.defaultMapping;
     } else if (dieType === 'd8') {
-      const d8Data = createD8(dieSize, diceColor, numberColor);
+      const d8Data = createD8(dieSize, internalDiceColor, internalNumberColor);
       geometry = d8Data.geometry;
       materials = [...d8Data.materials];
       baseMaterialsRef.current = [...materials];
       materialsRef.current = [...materials];
       currentFaceMappingRef.current = DICE_CONFIGS.d8.defaultMapping;
     } else {
-      const d20Data = createD20(dieSize, diceColor, numberColor);
+      const d20Data = createD20(dieSize, internalDiceColor, internalNumberColor);
       geometry = d20Data.geometry;
       materials = [...d20Data.materials];
       baseMaterialsRef.current = [...materials];
@@ -161,7 +200,7 @@ const DiceRoller: React.FC<DiceRollerProps> = ({
     );
     worldRef.current.addBody(dieBody);
     dieBodyRef.current = dieBody;
-  }, [dieType, dieSize, diceColor, numberColor]); // Remove physicsParams dependency!
+  }, [dieType, dieSize, internalDiceColor, internalNumberColor]); // Use internal color state
   
   // Detect face value
   const detectFaceValue = useCallback(() => {
@@ -180,6 +219,7 @@ const DiceRoller: React.FC<DiceRollerProps> = ({
     
     setIsRolling(true);
     stoppedFramesRef.current = 0;
+    if (onRollStart) onRollStart();
     
     // Generate throw parameters with current throw force
     const params = generateThrowParams(throwForce);
@@ -229,7 +269,7 @@ const DiceRoller: React.FC<DiceRollerProps> = ({
     dieBodyRef.current.quaternion.setFromEuler(...params.rotation);
     dieBodyRef.current.velocity.set(...params.velocity);
     dieBodyRef.current.angularVelocity.set(...params.angularVelocity);
-  }, [isRolling, targetResult, dieType, dieSize]);
+  }, [isRolling, targetResult, dieType, dieSize, throwForce, onRollStart]);
   
   // Animation loop
   const animate = useCallback(() => {
@@ -290,6 +330,7 @@ const DiceRoller: React.FC<DiceRollerProps> = ({
                 setLastResult(result);
                 if (onResult) onResult(result);
               }
+              if (onRollEnd) onRollEnd();
             }, ANIMATION_CONFIG.resultDelay);
           }
         } else {
@@ -306,7 +347,7 @@ const DiceRoller: React.FC<DiceRollerProps> = ({
     // Render
     rendererRef.current.render(sceneRef.current, cameraRef.current);
     frameRef.current = requestAnimationFrame(animate);
-  }, [isRolling, detectFaceValue, onResult, dieType]);
+  }, [isRolling, detectFaceValue, onResult, onRollEnd, dieType]);
   
   // Initialize
   useEffect(() => {
@@ -449,18 +490,21 @@ const DiceRoller: React.FC<DiceRollerProps> = ({
             onClick={throwDie}
           />
           
-          <div style={{ position: "absolute", bottom: 20, left: 20, color: "black" }}>
-            <div>Click anywhere to roll the die!</div>
-            {lastResult && (
-              <div style={{ fontSize: "24px", marginTop: "10px" }}>
-                Last roll: {lastResult}
-              </div>
-            )}
-          </div>
+          {showResultDisplay && (
+            <div style={{ position: "absolute", bottom: 20, left: 20, color: "black" }}>
+              <div>Click anywhere to roll the die!</div>
+              {lastResult && (
+                <div style={{ fontSize: "24px", marginTop: "10px" }}>
+                  Last roll: {lastResult}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
       
-      <div className={styles.controlsPanel}>
+      {showControls && (
+        <div className={styles.controlsPanel}>
         <div className={styles.controlsSection}>
           <h3 style={{ color: UI_CONFIG.controlsHeading }}>Die Controls</h3>
           
@@ -583,8 +627,8 @@ const DiceRoller: React.FC<DiceRollerProps> = ({
             <div style={{ display: 'flex', alignItems: 'center', marginTop: '5px', gap: '10px' }}>
               <input
                 type="color"
-                value={diceColor}
-                onChange={(e) => setDiceColor(e.target.value)}
+                value={internalDiceColor}
+                onChange={(e) => setInternalDiceColor(e.target.value)}
                 style={{ 
                   width: '50px', 
                   height: '30px',
@@ -600,7 +644,7 @@ const DiceRoller: React.FC<DiceRollerProps> = ({
                 fontFamily: 'monospace',
                 color: UI_CONFIG.controlsText
               }}>
-                {diceColor}
+                {internalDiceColor}
               </span>
             </div>
           </div>
@@ -610,8 +654,8 @@ const DiceRoller: React.FC<DiceRollerProps> = ({
             <div style={{ display: 'flex', alignItems: 'center', marginTop: '5px', gap: '10px' }}>
               <input
                 type="color"
-                value={numberColor}
-                onChange={(e) => setNumberColor(e.target.value)}
+                value={internalNumberColor}
+                onChange={(e) => setInternalNumberColor(e.target.value)}
                 style={{ 
                   width: '50px', 
                   height: '30px',
@@ -627,15 +671,15 @@ const DiceRoller: React.FC<DiceRollerProps> = ({
                 fontFamily: 'monospace',
                 color: UI_CONFIG.controlsText
               }}>
-                {numberColor}
+                {internalNumberColor}
               </span>
             </div>
           </div>
           
           <button
             onClick={() => {
-              setDiceColor('#4a90e2');
-              setNumberColor('#ffffff');
+              setInternalDiceColor('#4a90e2');
+              setInternalNumberColor('#ffffff');
             }}
             style={{
               backgroundColor: UI_CONFIG.inputBackground,
@@ -654,7 +698,8 @@ const DiceRoller: React.FC<DiceRollerProps> = ({
           params={physicsParams}
           onChange={handlePhysicsChange}
         />
-      </div>
+        </div>
+      )}
     </div>
   );
 };
