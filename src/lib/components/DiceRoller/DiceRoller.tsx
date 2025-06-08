@@ -1,5 +1,5 @@
 // React
-import { useRef, useState, useEffect, useCallback } from "react";
+import { useRef, useState, useEffect, useCallback, forwardRef, useImperativeHandle } from "react";
 
 // Three.js
 import * as THREE from "three";
@@ -14,14 +14,14 @@ import PhysicsControls from "./PhysicsControls";
 import { createD6Geometry, createD6Materials } from "./utils/geometries/d6";
 import { createD8 } from "./utils/geometries/d8";
 import { createD20 } from "./utils/geometries/d20";
-import { generateThrowParams, simulateThrow } from "./utils/predeterminedResults";
+import { generateThrowParams, generateBottomRightThrowParams, simulateThrow } from "./utils/predeterminedResults";
 import { createPhysicsWorld, createDieBody } from "./utils/physicsSetup";
 import { detectMeshFaceValue } from "./utils/faceDetection";
 import { setupCompleteScene } from "./utils/sceneSetup";
 import { calculateMaterialShift, resetMaterials } from "./utils/materialShifting";
 
 // Types
-import type { DiceRollerProps, DieType, PhysicsParams } from "../../types";
+import type { DiceRollerProps, DiceRollerHandle, DieType, PhysicsParams } from "../../types";
 
 // Constants
 import { 
@@ -37,7 +37,7 @@ import {
 // Styles
 import styles from "./DiceRoller.module.css";
 
-const DiceRoller: React.FC<DiceRollerProps> = ({
+const DiceRoller = forwardRef<DiceRollerHandle, DiceRollerProps>(({
   // Visual customization
   diceColor = '#4a90e2',
   numberColor = '#ffffff',
@@ -60,7 +60,8 @@ const DiceRoller: React.FC<DiceRollerProps> = ({
   showControls = false,
   showResultDisplay = true,
   throwForce: propThrowForce = 1.0,
-}) => {
+  autoRoll = true,
+}, ref) => {
   const mountRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
@@ -85,6 +86,7 @@ const DiceRoller: React.FC<DiceRollerProps> = ({
   const [throwForce, setThrowForce] = useState<number>(propThrowForce);
   const [internalDiceColor, setInternalDiceColor] = useState<string>(diceColor);
   const [internalNumberColor, setInternalNumberColor] = useState<string>(numberColor);
+  const [diceSpawned, setDiceSpawned] = useState(false);
   const stoppedFramesRef = useRef<number>(0);
   const physicsParamsRef = useRef(physicsParams);
   
@@ -188,19 +190,24 @@ const DiceRoller: React.FC<DiceRollerProps> = ({
     const mesh = new THREE.Mesh(geometry, materials);
     mesh.castShadow = true;
     mesh.receiveShadow = true;
-    sceneRef.current.add(mesh);
-    dieMeshRef.current = mesh;
     
-    // Add physics body
-    dieBody.position.set(...THROW_CONFIG.startPosition);
-    dieBody.quaternion.setFromEuler(
-      Math.random() * Math.PI,
-      Math.random() * Math.PI,
-      Math.random() * Math.PI
-    );
-    worldRef.current.addBody(dieBody);
+    // Store references but don't add to scene yet
+    dieMeshRef.current = mesh;
     dieBodyRef.current = dieBody;
-  }, [dieType, dieSize, internalDiceColor, internalNumberColor]); // Use internal color state
+    
+    // Only add to scene if autoRoll is true
+    if (autoRoll) {
+      sceneRef.current.add(mesh);
+      dieBody.position.set(...THROW_CONFIG.startPosition);
+      dieBody.quaternion.setFromEuler(
+        Math.random() * Math.PI,
+        Math.random() * Math.PI,
+        Math.random() * Math.PI
+      );
+      worldRef.current.addBody(dieBody);
+      setDiceSpawned(true);
+    }
+  }, [dieType, dieSize, internalDiceColor, internalNumberColor, autoRoll]); // Use internal color state
   
   // Detect face value
   const detectFaceValue = useCallback(() => {
@@ -215,14 +222,22 @@ const DiceRoller: React.FC<DiceRollerProps> = ({
   
   // Handle throw
   const throwDie = useCallback(() => {
-    if (!dieBodyRef.current || !dieMeshRef.current || isRolling) return;
+    if (!dieBodyRef.current || !dieMeshRef.current || isRolling || !sceneRef.current || !worldRef.current) return;
+    
+    // If dice hasn't been spawned yet, add it to the scene
+    if (!diceSpawned) {
+      sceneRef.current.add(dieMeshRef.current);
+      worldRef.current.addBody(dieBodyRef.current);
+      setDiceSpawned(true);
+    }
     
     setIsRolling(true);
     stoppedFramesRef.current = 0;
     if (onRollStart) onRollStart();
     
     // Generate throw parameters with current throw force
-    const params = generateThrowParams(throwForce);
+    // Use bottom-right throw when dice wasn't already spawned (external trigger)
+    const params = !autoRoll || !diceSpawned ? generateBottomRightThrowParams(throwForce) : generateThrowParams(throwForce);
     
     // Handle predetermined result
     const desiredResult = targetResult;
@@ -269,7 +284,12 @@ const DiceRoller: React.FC<DiceRollerProps> = ({
     dieBodyRef.current.quaternion.setFromEuler(...params.rotation);
     dieBodyRef.current.velocity.set(...params.velocity);
     dieBodyRef.current.angularVelocity.set(...params.angularVelocity);
-  }, [isRolling, targetResult, dieType, dieSize, throwForce, onRollStart]);
+  }, [isRolling, targetResult, dieType, dieSize, throwForce, onRollStart, diceSpawned, autoRoll]);
+  
+  // Expose roll method via ref
+  useImperativeHandle(ref, () => ({
+    roll: throwDie
+  }), [throwDie]);
   
   // Animation loop
   const animate = useCallback(() => {
@@ -487,12 +507,12 @@ const DiceRoller: React.FC<DiceRollerProps> = ({
           <div 
             ref={mountRef} 
             style={{ width: '100%', height: '100%', cursor: 'pointer' }}
-            onClick={throwDie}
+            onClick={autoRoll ? throwDie : undefined}
           />
           
           {showResultDisplay && (
             <div style={{ position: "absolute", bottom: 20, left: 20, color: "black" }}>
-              <div>Click anywhere to roll the die!</div>
+              <div>{autoRoll ? 'Click anywhere to roll the die!' : 'Waiting for roll...'}</div>
               {lastResult && (
                 <div style={{ fontSize: "24px", marginTop: "10px" }}>
                   Last roll: {lastResult}
@@ -702,6 +722,8 @@ const DiceRoller: React.FC<DiceRollerProps> = ({
       )}
     </div>
   );
-};
+});
+
+DiceRoller.displayName = 'DiceRoller';
 
 export default DiceRoller;

@@ -28,6 +28,30 @@ export function generateThrowParams(throwForce: number = THROW_CONFIG.defaultFor
   };
 }
 
+// Generate throw parameters from bottom-right corner
+export function generateBottomRightThrowParams(throwForce: number = THROW_CONFIG.defaultForce): ThrowParams {
+  const force = Math.max(THROW_CONFIG.minForce, Math.min(THROW_CONFIG.maxForce, throwForce));
+  
+  return {
+    position: [4, 2, 3] as [number, number, number], // Bottom-right corner, higher up
+    rotation: [
+      Math.random() * Math.PI * 2,
+      Math.random() * Math.PI * 2,
+      Math.random() * Math.PI * 2
+    ],
+    velocity: [
+      -THROW_CONFIG.velocityScale * force * 1.5, // More force towards left
+      THROW_CONFIG.velocityScale * force * 0.8,   // Less upward, more horizontal
+      -THROW_CONFIG.velocityScale * force * 1.0  // Towards camera
+    ],
+    angularVelocity: [
+      (Math.random() - 0.5) * THROW_CONFIG.angularVelocityScale * force * 1.5,
+      (Math.random() - 0.5) * THROW_CONFIG.angularVelocityScale * force * 1.5,
+      (Math.random() - 0.5) * THROW_CONFIG.angularVelocityScale * force * 1.5
+    ]
+  };
+}
+
 
 // Check if die has stopped moving
 export function diceHasStopped(body: CANNON.Body, threshold: number = PHYSICS_SIM_CONFIG.linearThreshold): boolean {

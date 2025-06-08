@@ -2052,6 +2052,31 @@
       ]
     };
   }
+  function generateBottomRightThrowParams(throwForce = THROW_CONFIG.defaultForce) {
+    const force = Math.max(THROW_CONFIG.minForce, Math.min(THROW_CONFIG.maxForce, throwForce));
+    return {
+      position: [4, 2, 3],
+      // Bottom-right corner, higher up
+      rotation: [
+        Math.random() * Math.PI * 2,
+        Math.random() * Math.PI * 2,
+        Math.random() * Math.PI * 2
+      ],
+      velocity: [
+        -THROW_CONFIG.velocityScale * force * 1.5,
+        // More force towards left
+        THROW_CONFIG.velocityScale * force * 0.8,
+        // Less upward, more horizontal
+        -THROW_CONFIG.velocityScale * force * 1
+        // Towards camera
+      ],
+      angularVelocity: [
+        (Math.random() - 0.5) * THROW_CONFIG.angularVelocityScale * force * 1.5,
+        (Math.random() - 0.5) * THROW_CONFIG.angularVelocityScale * force * 1.5,
+        (Math.random() - 0.5) * THROW_CONFIG.angularVelocityScale * force * 1.5
+      ]
+    };
+  }
   function diceHasStopped(body, threshold = PHYSICS_SIM_CONFIG.linearThreshold) {
     const v = body.velocity;
     const av = body.angularVelocity;
@@ -2323,7 +2348,7 @@
     mesh.material = baseMaterials;
     return DICE_CONFIGS[dieType].defaultMapping;
   }
-  const DiceRoller = ({
+  const DiceRoller = require$$0.forwardRef(({
     // Visual customization
     diceColor = "#4a90e2",
     numberColor = "#ffffff",
@@ -2341,8 +2366,9 @@
     // Optional features
     showControls = false,
     showResultDisplay = true,
-    throwForce: propThrowForce = 1
-  }) => {
+    throwForce: propThrowForce = 1,
+    autoRoll = true
+  }, ref) => {
     const mountRef = require$$0.useRef(null);
     const sceneRef = require$$0.useRef(null);
     const rendererRef = require$$0.useRef(null);
@@ -2366,6 +2392,7 @@
     const [throwForce, setThrowForce] = require$$0.useState(propThrowForce);
     const [internalDiceColor, setInternalDiceColor] = require$$0.useState(diceColor);
     const [internalNumberColor, setInternalNumberColor] = require$$0.useState(numberColor);
+    const [diceSpawned, setDiceSpawned] = require$$0.useState(false);
     const stoppedFramesRef = require$$0.useRef(0);
     const physicsParamsRef = require$$0.useRef(physicsParams);
     require$$0.useEffect(() => {
@@ -2443,17 +2470,20 @@
       const mesh = new THREE__namespace.Mesh(geometry, materials);
       mesh.castShadow = true;
       mesh.receiveShadow = true;
-      sceneRef.current.add(mesh);
       dieMeshRef.current = mesh;
-      dieBody.position.set(...THROW_CONFIG.startPosition);
-      dieBody.quaternion.setFromEuler(
-        Math.random() * Math.PI,
-        Math.random() * Math.PI,
-        Math.random() * Math.PI
-      );
-      worldRef.current.addBody(dieBody);
       dieBodyRef.current = dieBody;
-    }, [dieType, dieSize, internalDiceColor, internalNumberColor]);
+      if (autoRoll) {
+        sceneRef.current.add(mesh);
+        dieBody.position.set(...THROW_CONFIG.startPosition);
+        dieBody.quaternion.setFromEuler(
+          Math.random() * Math.PI,
+          Math.random() * Math.PI,
+          Math.random() * Math.PI
+        );
+        worldRef.current.addBody(dieBody);
+        setDiceSpawned(true);
+      }
+    }, [dieType, dieSize, internalDiceColor, internalNumberColor, autoRoll]);
     const detectFaceValue = require$$0.useCallback(() => {
       if (!dieMeshRef.current) return -1;
       return detectMeshFaceValue(
@@ -2463,11 +2493,16 @@
       );
     }, [dieType]);
     const throwDie = require$$0.useCallback(() => {
-      if (!dieBodyRef.current || !dieMeshRef.current || isRolling) return;
+      if (!dieBodyRef.current || !dieMeshRef.current || isRolling || !sceneRef.current || !worldRef.current) return;
+      if (!diceSpawned) {
+        sceneRef.current.add(dieMeshRef.current);
+        worldRef.current.addBody(dieBodyRef.current);
+        setDiceSpawned(true);
+      }
       setIsRolling(true);
       stoppedFramesRef.current = 0;
       if (onRollStart) onRollStart();
-      const params = generateThrowParams(throwForce);
+      const params = !autoRoll || !diceSpawned ? generateBottomRightThrowParams(throwForce) : generateThrowParams(throwForce);
       const desiredResult = targetResult;
       const maxValue = DICE_CONFIGS[dieType].faces;
       if (desiredResult && desiredResult >= 1 && desiredResult <= maxValue) {
@@ -2504,7 +2539,10 @@
       dieBodyRef.current.quaternion.setFromEuler(...params.rotation);
       dieBodyRef.current.velocity.set(...params.velocity);
       dieBodyRef.current.angularVelocity.set(...params.angularVelocity);
-    }, [isRolling, targetResult, dieType, dieSize, throwForce, onRollStart]);
+    }, [isRolling, targetResult, dieType, dieSize, throwForce, onRollStart, diceSpawned, autoRoll]);
+    require$$0.useImperativeHandle(ref, () => ({
+      roll: throwDie
+    }), [throwDie]);
     const animate = require$$0.useCallback(() => {
       if (!sceneRef.current || !rendererRef.current || !cameraRef.current || !worldRef.current) return;
       worldRef.current.step(PHYSICS_SIM_CONFIG.timeStep);
@@ -2657,11 +2695,11 @@
           {
             ref: mountRef,
             style: { width: "100%", height: "100%", cursor: "pointer" },
-            onClick: throwDie
+            onClick: autoRoll ? throwDie : void 0
           }
         ),
         showResultDisplay && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { position: "absolute", bottom: 20, left: 20, color: "black" }, children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { children: "Click anywhere to roll the die!" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { children: autoRoll ? "Click anywhere to roll the die!" : "Waiting for roll..." }),
           lastResult && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { fontSize: "24px", marginTop: "10px" }, children: [
             "Last roll: ",
             lastResult
@@ -2875,7 +2913,8 @@
         )
       ] })
     ] });
-  };
+  });
+  DiceRoller.displayName = "DiceRoller";
   exports2.ANIMATION_CONFIG = ANIMATION_CONFIG;
   exports2.DEFAULT_PHYSICS = DEFAULT_PHYSICS;
   exports2.DICE_CONFIGS = DICE_CONFIGS;

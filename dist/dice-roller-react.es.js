@@ -1,4 +1,4 @@
-import require$$0, { useRef, useState, useEffect, useCallback } from "react";
+import require$$0, { forwardRef, useRef, useState, useEffect, useCallback, useImperativeHandle } from "react";
 import * as THREE from "three";
 import { Vector3, MOUSE, TOUCH, Spherical, Quaternion, OrthographicCamera, Vector2, PerspectiveCamera, Ray, Plane, BoxGeometry } from "three";
 import * as CANNON from "cannon-es";
@@ -2034,6 +2034,31 @@ function generateThrowParams(throwForce = THROW_CONFIG.defaultForce) {
     ]
   };
 }
+function generateBottomRightThrowParams(throwForce = THROW_CONFIG.defaultForce) {
+  const force = Math.max(THROW_CONFIG.minForce, Math.min(THROW_CONFIG.maxForce, throwForce));
+  return {
+    position: [4, 2, 3],
+    // Bottom-right corner, higher up
+    rotation: [
+      Math.random() * Math.PI * 2,
+      Math.random() * Math.PI * 2,
+      Math.random() * Math.PI * 2
+    ],
+    velocity: [
+      -THROW_CONFIG.velocityScale * force * 1.5,
+      // More force towards left
+      THROW_CONFIG.velocityScale * force * 0.8,
+      // Less upward, more horizontal
+      -THROW_CONFIG.velocityScale * force * 1
+      // Towards camera
+    ],
+    angularVelocity: [
+      (Math.random() - 0.5) * THROW_CONFIG.angularVelocityScale * force * 1.5,
+      (Math.random() - 0.5) * THROW_CONFIG.angularVelocityScale * force * 1.5,
+      (Math.random() - 0.5) * THROW_CONFIG.angularVelocityScale * force * 1.5
+    ]
+  };
+}
 function diceHasStopped(body, threshold = PHYSICS_SIM_CONFIG.linearThreshold) {
   const v = body.velocity;
   const av = body.angularVelocity;
@@ -2305,7 +2330,7 @@ function resetMaterials(mesh, baseMaterials, dieType) {
   mesh.material = baseMaterials;
   return DICE_CONFIGS[dieType].defaultMapping;
 }
-const DiceRoller = ({
+const DiceRoller = forwardRef(({
   // Visual customization
   diceColor = "#4a90e2",
   numberColor = "#ffffff",
@@ -2323,8 +2348,9 @@ const DiceRoller = ({
   // Optional features
   showControls = false,
   showResultDisplay = true,
-  throwForce: propThrowForce = 1
-}) => {
+  throwForce: propThrowForce = 1,
+  autoRoll = true
+}, ref) => {
   const mountRef = useRef(null);
   const sceneRef = useRef(null);
   const rendererRef = useRef(null);
@@ -2348,6 +2374,7 @@ const DiceRoller = ({
   const [throwForce, setThrowForce] = useState(propThrowForce);
   const [internalDiceColor, setInternalDiceColor] = useState(diceColor);
   const [internalNumberColor, setInternalNumberColor] = useState(numberColor);
+  const [diceSpawned, setDiceSpawned] = useState(false);
   const stoppedFramesRef = useRef(0);
   const physicsParamsRef = useRef(physicsParams);
   useEffect(() => {
@@ -2425,17 +2452,20 @@ const DiceRoller = ({
     const mesh = new THREE.Mesh(geometry, materials);
     mesh.castShadow = true;
     mesh.receiveShadow = true;
-    sceneRef.current.add(mesh);
     dieMeshRef.current = mesh;
-    dieBody.position.set(...THROW_CONFIG.startPosition);
-    dieBody.quaternion.setFromEuler(
-      Math.random() * Math.PI,
-      Math.random() * Math.PI,
-      Math.random() * Math.PI
-    );
-    worldRef.current.addBody(dieBody);
     dieBodyRef.current = dieBody;
-  }, [dieType, dieSize, internalDiceColor, internalNumberColor]);
+    if (autoRoll) {
+      sceneRef.current.add(mesh);
+      dieBody.position.set(...THROW_CONFIG.startPosition);
+      dieBody.quaternion.setFromEuler(
+        Math.random() * Math.PI,
+        Math.random() * Math.PI,
+        Math.random() * Math.PI
+      );
+      worldRef.current.addBody(dieBody);
+      setDiceSpawned(true);
+    }
+  }, [dieType, dieSize, internalDiceColor, internalNumberColor, autoRoll]);
   const detectFaceValue = useCallback(() => {
     if (!dieMeshRef.current) return -1;
     return detectMeshFaceValue(
@@ -2445,11 +2475,16 @@ const DiceRoller = ({
     );
   }, [dieType]);
   const throwDie = useCallback(() => {
-    if (!dieBodyRef.current || !dieMeshRef.current || isRolling) return;
+    if (!dieBodyRef.current || !dieMeshRef.current || isRolling || !sceneRef.current || !worldRef.current) return;
+    if (!diceSpawned) {
+      sceneRef.current.add(dieMeshRef.current);
+      worldRef.current.addBody(dieBodyRef.current);
+      setDiceSpawned(true);
+    }
     setIsRolling(true);
     stoppedFramesRef.current = 0;
     if (onRollStart) onRollStart();
-    const params = generateThrowParams(throwForce);
+    const params = !autoRoll || !diceSpawned ? generateBottomRightThrowParams(throwForce) : generateThrowParams(throwForce);
     const desiredResult = targetResult;
     const maxValue = DICE_CONFIGS[dieType].faces;
     if (desiredResult && desiredResult >= 1 && desiredResult <= maxValue) {
@@ -2486,7 +2521,10 @@ const DiceRoller = ({
     dieBodyRef.current.quaternion.setFromEuler(...params.rotation);
     dieBodyRef.current.velocity.set(...params.velocity);
     dieBodyRef.current.angularVelocity.set(...params.angularVelocity);
-  }, [isRolling, targetResult, dieType, dieSize, throwForce, onRollStart]);
+  }, [isRolling, targetResult, dieType, dieSize, throwForce, onRollStart, diceSpawned, autoRoll]);
+  useImperativeHandle(ref, () => ({
+    roll: throwDie
+  }), [throwDie]);
   const animate = useCallback(() => {
     if (!sceneRef.current || !rendererRef.current || !cameraRef.current || !worldRef.current) return;
     worldRef.current.step(PHYSICS_SIM_CONFIG.timeStep);
@@ -2639,11 +2677,11 @@ const DiceRoller = ({
         {
           ref: mountRef,
           style: { width: "100%", height: "100%", cursor: "pointer" },
-          onClick: throwDie
+          onClick: autoRoll ? throwDie : void 0
         }
       ),
       showResultDisplay && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { position: "absolute", bottom: 20, left: 20, color: "black" }, children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { children: "Click anywhere to roll the die!" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { children: autoRoll ? "Click anywhere to roll the die!" : "Waiting for roll..." }),
         lastResult && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { fontSize: "24px", marginTop: "10px" }, children: [
           "Last roll: ",
           lastResult
@@ -2857,7 +2895,8 @@ const DiceRoller = ({
       )
     ] })
   ] });
-};
+});
+DiceRoller.displayName = "DiceRoller";
 export {
   ANIMATION_CONFIG,
   DEFAULT_PHYSICS,

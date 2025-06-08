@@ -9,6 +9,7 @@ export { default as DiceRoller } from './components/DiceRoller/DiceRoller';
 // Type exports
 export type { 
   DiceRollerProps,
+  DiceRollerHandle,
   DieType,
   PhysicsParams,
   ThrowParams,

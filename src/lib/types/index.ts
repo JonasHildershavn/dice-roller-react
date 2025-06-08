@@ -30,6 +30,12 @@ export interface DiceRollerProps {
   showControls?: boolean;     // Default: false - hide physics controls
   showResultDisplay?: boolean; // Default: true - show last result
   throwForce?: number;        // Default: 1.0 - multiplier for throw force
+  autoRoll?: boolean;         // Default: true - automatically roll on mount/click
+}
+
+// Ref handle for imperative control
+export interface DiceRollerHandle {
+  roll: () => void;
 }
 
 // ==================== Dice Types ====================

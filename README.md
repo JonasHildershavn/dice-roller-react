@@ -10,6 +10,7 @@ A React 3D dice roller component with realistic physics simulation and predeterm
 - ⚡ Realistic physics with Three.js and Cannon-ES
 - 🎮 Optional physics controls panel
 - 📱 Responsive design
+- 🎯 External control via ref API - trigger rolls programmatically
 
 ## Installation
 
@@ -59,6 +60,7 @@ function App() {
 | `showControls` | `boolean` | `false` | Show physics controls panel |
 | `showResultDisplay` | `boolean` | `true` | Show result display overlay |
 | `throwForce` | `number` | `1.0` | Multiplier for throw force |
+| `autoRoll` | `boolean` | `true` | Auto-roll on mount/click. Set to `false` for external control |
 
 ## Advanced Example
 
@@ -90,6 +92,54 @@ function DiceGame() {
         showControls={false}
         throwForce={1.5}
       />
+    </div>
+  )
+}
+```
+
+## External Control Example
+
+```tsx
+import { useRef } from 'react'
+import { DiceRoller, DiceRollerHandle } from 'dice-roller-react'
+import 'dice-roller-react/dist/style.css'
+
+function DnDSkillCheck() {
+  const diceRef = useRef<DiceRollerHandle>(null)
+  const [dc] = useState(15) // Difficulty Class
+  const [result, setResult] = useState<number | null>(null)
+  
+  const attemptSkillCheck = async () => {
+    // Calculate result on backend (example)
+    const response = await fetch('/api/roll-skill-check').then(r => r.json())
+    setResult(response.roll) // Set the predetermined result
+    
+    // Trigger dice animation with predetermined result
+    if (diceRef.current) {
+      diceRef.current.roll()
+    }
+  }
+  
+  return (
+    <div>
+      {/* Full screen dice overlay */}
+      <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none' }}>
+        <DiceRoller
+          ref={diceRef}
+          dieType="d20"
+          autoRoll={false} // Don't auto-roll on mount
+          predeterminedResult={result}
+          width={window.innerWidth}
+          height={window.innerHeight}
+          onResult={(value) => {
+            console.log(`Rolled ${value} vs DC ${dc}`)
+          }}
+          showResultDisplay={false}
+        />
+      </div>
+      
+      {/* Your game UI */}
+      <button onClick={attemptSkillCheck}>Attempt Skill Check</button>
     </div>
   )
 }
