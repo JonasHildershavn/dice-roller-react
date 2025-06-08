@@ -5,7 +5,7 @@ package-lock.json
 yarn.lock
 
 # Build output
-dist/
+# dist/ - We need to track dist for GitHub installs
 dist-ssr/
 *.local
 

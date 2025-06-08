@@ -1,0 +1,31 @@
+# Source files (not needed in npm package)
+src/demo/
+index.html
+vite.config.ts
+tsconfig.json
+tsconfig.app.json
+tsconfig.node.json
+tsconfig.lib.json
+eslint.config.js
+
+# Documentation files
+CLAUDE.md
+REFACTORING-PLAN.md
+
+# Git files
+.git/
+.gitignore
+
+# Editor files
+.vscode/
+.idea/
+
+# Dependencies
+node_modules/
+pnpm-lock.yaml
+
+# Build artifacts
+*.map
+
+# Misc
+.DS_Store

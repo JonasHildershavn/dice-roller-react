@@ -1,0 +1,64 @@
+._diceContainer_1ab37_1 {
+  position: relative;
+  overflow: hidden;
+  background: transparent;
+  /* Remove border for overlay effect */
+}
+
+._diceWrapper_1ab37_8 {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+._sceneContainer_1ab37_14 {
+  flex: 1;
+}
+
+._controlsPanel_1ab37_18 {
+  width: 350px;
+  background: #f5f5f5;
+  padding: 20px;
+  border-radius: 4px;
+  overflow-y: auto;
+  max-height: 600px;
+}
+
+._controlsSection_1ab37_27 {
+  margin-bottom: 20px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #ddd;
+}
+
+._controlsSection_1ab37_27:last-child {
+  border-bottom: none;
+}
+
+._physicsControls_1ab37_37 {
+  margin-top: 20px;
+}
+
+._physicsSection_1ab37_41 {
+  margin-bottom: 15px;
+}
+
+._physicsSection_1ab37_41 h4 {
+  margin: 10px 0 5px 0;
+  color: #333;
+}
+
+._sliderControl_1ab37_50 {
+  margin-bottom: 8px;
+}
+
+._sliderControl_1ab37_50 label {
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+}
+
+._sliderControl_1ab37_50 span {
+  width: 120px;
+  text-align: right;
+  margin-right: 10px;
+}
