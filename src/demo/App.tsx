@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react'
 import { DiceRoller } from '../lib'
 import type { DieType, DiceRollerHandle } from '../lib'
+import SkillCheckExample from './SkillCheckExample'
 import './App.css'
 
 function App() {
@@ -10,12 +11,46 @@ function App() {
   const [diceColor, setDiceColor] = useState('#4a90e2')
   const [numberColor, setNumberColor] = useState('#ffffff')
   const [showControls, setShowControls] = useState(true)
-  const [testExternalControl, setTestExternalControl] = useState(false)
+  const [showSkillCheckExample, setShowSkillCheckExample] = useState(false)
   const diceRef = useRef<DiceRollerHandle>(null)
+  
+  const handleRoll = () => {
+    diceRef.current?.roll(predeterminedResult ?? undefined)
+  }
+  
+  if (showSkillCheckExample) {
+    return (
+      <div className="App">
+        <button 
+          onClick={() => setShowSkillCheckExample(false)}
+          style={{ marginBottom: '20px' }}
+        >
+          ← Back to Demo
+        </button>
+        <SkillCheckExample />
+      </div>
+    )
+  }
   
   return (
     <div className="App">
       <h1>Dice Roller React Demo</h1>
+      
+      <div style={{ marginBottom: '20px' }}>
+        <button 
+          onClick={() => setShowSkillCheckExample(true)}
+          style={{
+            padding: '10px 20px',
+            backgroundColor: '#28a745',
+            color: 'white',
+            border: 'none',
+            borderRadius: '5px',
+            cursor: 'pointer'
+          }}
+        >
+          View Skill Check Example (Ideal API Usage)
+        </button>
+      </div>
       
       <div style={{ marginBottom: '20px' }}>
         <h3>Component Props Demo</h3>
@@ -71,16 +106,6 @@ function App() {
             </label>
           </div>
           
-          <div>
-            <label>
-              <input 
-                type="checkbox" 
-                checked={testExternalControl} 
-                onChange={(e) => setTestExternalControl(e.target.checked)}
-              />
-              Test External Control
-            </label>
-          </div>
         </div>
         
         {lastResult && (
@@ -90,57 +115,32 @@ function App() {
         )}
       </div>
       
-      {!testExternalControl ? (
-        <DiceRoller 
-          dieType={dieType}
-          diceColor={diceColor}
-          numberColor={numberColor}
-          predeterminedResult={predeterminedResult}
-          showControls={showControls}
-          onResult={setLastResult}
-          onRollStart={() => console.log('Roll started!')}
-          onRollEnd={() => console.log('Roll ended!')}
-        />
-      ) : (
-        <div>
-          <div style={{ marginBottom: '20px' }}>
-            <button 
-              onClick={() => diceRef.current?.roll()}
-              style={{
-                padding: '10px 20px',
-                fontSize: '16px',
-                backgroundColor: '#4a90e2',
-                color: 'white',
-                border: 'none',
-                borderRadius: '5px',
-                cursor: 'pointer'
-              }}
-            >
-              Roll Dice Externally
-            </button>
-            <span style={{ marginLeft: '10px', color: '#666' }}>
-              (Dice will throw from bottom-right corner)
-            </span>
-          </div>
-          
-          <div style={{ position: 'relative', width: '100%', height: '600px' }}>
-            <DiceRoller 
-              ref={diceRef}
-              dieType={dieType}
-              diceColor={diceColor}
-              numberColor={numberColor}
-              predeterminedResult={predeterminedResult}
-              autoRoll={false}
-              showControls={showControls}
-              width={800}
-              height={600}
-              onResult={setLastResult}
-              onRollStart={() => console.log('Roll started!')}
-              onRollEnd={() => console.log('Roll ended!')}
-            />
-          </div>
-        </div>
-      )}
+      <div style={{ marginBottom: '20px' }}>
+        <button 
+          onClick={handleRoll}
+          style={{
+            padding: '10px 20px',
+            fontSize: '16px',
+            backgroundColor: '#4a90e2',
+            color: 'white',
+            border: 'none',
+            borderRadius: '5px',
+            cursor: 'pointer'
+          }}
+        >
+          Roll Dice{predeterminedResult ? ` (${predeterminedResult})` : ' (Random)'}
+        </button>
+      </div>
+      
+      <DiceRoller 
+        ref={diceRef}
+        dieType={dieType}
+        diceColor={diceColor}
+        numberColor={numberColor}
+        showControls={showControls}
+        onRollComplete={setLastResult}
+        onRollStart={() => console.log('Roll started!')}
+      />
     </div>
   )
 }

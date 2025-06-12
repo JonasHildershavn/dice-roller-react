@@ -44,7 +44,6 @@ const DiceRoller = forwardRef<DiceRollerHandle, DiceRollerProps>(({
   
   // Die configuration
   dieType: propDieType = 'd6',
-  predeterminedResult = null,
   
   // Size and display
   width = 600,
@@ -52,15 +51,13 @@ const DiceRoller = forwardRef<DiceRollerHandle, DiceRollerProps>(({
   dieSize = 1,
   
   // Callbacks
-  onResult,
+  onRollComplete,
   onRollStart,
-  onRollEnd,
   
   // Optional features
   showControls = false,
   showResultDisplay = true,
   throwForce: propThrowForce = 1.0,
-  autoRoll = true,
 }, ref) => {
   const mountRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
@@ -77,7 +74,6 @@ const DiceRoller = forwardRef<DiceRollerHandle, DiceRollerProps>(({
   const diceMaterialRef = useRef<CANNON.Material | null>(null);
   
   const [lastResult, setLastResult] = useState<number | null>(null);
-  const [targetResult, setTargetResult] = useState<number | null>(predeterminedResult ?? null);
   const [dieType, setDieType] = useState<DieType>(propDieType);
   const [isRolling, setIsRolling] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
@@ -89,12 +85,9 @@ const DiceRoller = forwardRef<DiceRollerHandle, DiceRollerProps>(({
   const [diceSpawned, setDiceSpawned] = useState(false);
   const stoppedFramesRef = useRef<number>(0);
   const physicsParamsRef = useRef(physicsParams);
+  const targetResultRef = useRef<number | null>(null);
   
   // Sync props with internal state
-  useEffect(() => {
-    setTargetResult(predeterminedResult);
-  }, [predeterminedResult]);
-  
   useEffect(() => {
     setDieType(propDieType as DieType);
   }, [propDieType]);
@@ -195,19 +188,8 @@ const DiceRoller = forwardRef<DiceRollerHandle, DiceRollerProps>(({
     dieMeshRef.current = mesh;
     dieBodyRef.current = dieBody;
     
-    // Only add to scene if autoRoll is true
-    if (autoRoll) {
-      sceneRef.current.add(mesh);
-      dieBody.position.set(...THROW_CONFIG.startPosition);
-      dieBody.quaternion.setFromEuler(
-        Math.random() * Math.PI,
-        Math.random() * Math.PI,
-        Math.random() * Math.PI
-      );
-      worldRef.current.addBody(dieBody);
-      setDiceSpawned(true);
-    }
-  }, [dieType, dieSize, internalDiceColor, internalNumberColor, autoRoll]); // Use internal color state
+    // Don't add to scene initially - wait for roll() to be called
+  }, [dieType, dieSize, internalDiceColor, internalNumberColor]); // Use internal color state
   
   // Detect face value
   const detectFaceValue = useCallback(() => {
@@ -221,7 +203,7 @@ const DiceRoller = forwardRef<DiceRollerHandle, DiceRollerProps>(({
   }, [dieType]);
   
   // Handle throw
-  const throwDie = useCallback(() => {
+  const throwDie = useCallback((predeterminedResult?: number) => {
     if (!dieBodyRef.current || !dieMeshRef.current || isRolling || !sceneRef.current || !worldRef.current) return;
     
     // If dice hasn't been spawned yet, add it to the scene
@@ -235,12 +217,15 @@ const DiceRoller = forwardRef<DiceRollerHandle, DiceRollerProps>(({
     stoppedFramesRef.current = 0;
     if (onRollStart) onRollStart();
     
+    // Store the target result for this roll
+    targetResultRef.current = predeterminedResult ?? null;
+    
     // Generate throw parameters with current throw force
-    // Use bottom-right throw when dice wasn't already spawned (external trigger)
-    const params = !autoRoll || !diceSpawned ? generateBottomRightThrowParams(throwForce) : generateThrowParams(throwForce);
+    // Always use bottom-right throw since we're not auto-rolling anymore
+    const params = generateBottomRightThrowParams(throwForce);
     
     // Handle predetermined result
-    const desiredResult = targetResult;
+    const desiredResult = predeterminedResult;
     const maxValue = DICE_CONFIGS[dieType].faces;
     if (desiredResult && desiredResult >= 1 && desiredResult <= maxValue) {
       // Run simulation with current physics params
@@ -284,11 +269,11 @@ const DiceRoller = forwardRef<DiceRollerHandle, DiceRollerProps>(({
     dieBodyRef.current.quaternion.setFromEuler(...params.rotation);
     dieBodyRef.current.velocity.set(...params.velocity);
     dieBodyRef.current.angularVelocity.set(...params.angularVelocity);
-  }, [isRolling, targetResult, dieType, dieSize, throwForce, onRollStart, diceSpawned, autoRoll]);
+  }, [isRolling, dieType, dieSize, throwForce, onRollStart, diceSpawned]);
   
   // Expose roll method via ref
   useImperativeHandle(ref, () => ({
-    roll: throwDie
+    roll: (predeterminedResult?: number) => throwDie(predeterminedResult)
   }), [throwDie]);
   
   // Animation loop
@@ -348,9 +333,8 @@ const DiceRoller = forwardRef<DiceRollerHandle, DiceRollerProps>(({
               const result = detectFaceValue();
               if (result > 0) {
                 setLastResult(result);
-                if (onResult) onResult(result);
+                if (onRollComplete) onRollComplete(result);
               }
-              if (onRollEnd) onRollEnd();
             }, ANIMATION_CONFIG.resultDelay);
           }
         } else {
@@ -367,7 +351,7 @@ const DiceRoller = forwardRef<DiceRollerHandle, DiceRollerProps>(({
     // Render
     rendererRef.current.render(sceneRef.current, cameraRef.current);
     frameRef.current = requestAnimationFrame(animate);
-  }, [isRolling, detectFaceValue, onResult, onRollEnd, dieType]);
+  }, [isRolling, detectFaceValue, onRollComplete, dieType]);
   
   // Initialize
   useEffect(() => {
@@ -506,13 +490,12 @@ const DiceRoller = forwardRef<DiceRollerHandle, DiceRollerProps>(({
         <div className={styles.diceContainer} style={{ width, height }}>
           <div 
             ref={mountRef} 
-            style={{ width: '100%', height: '100%', cursor: 'pointer' }}
-            onClick={autoRoll ? throwDie : undefined}
+            style={{ width: '100%', height: '100%' }}
           />
           
           {showResultDisplay && (
             <div style={{ position: "absolute", bottom: 20, left: 20, color: "black" }}>
-              <div>{autoRoll ? 'Click anywhere to roll the die!' : 'Waiting for roll...'}</div>
+              <div>{diceSpawned ? 'Ready to roll!' : 'Use roll() to start'}</div>
               {lastResult && (
                 <div style={{ fontSize: "24px", marginTop: "10px" }}>
                   Last roll: {lastResult}
@@ -559,7 +542,6 @@ const DiceRoller = forwardRef<DiceRollerHandle, DiceRollerProps>(({
               <button 
                 onClick={() => {
                   setDieType('d6');
-                  setTargetResult(null);
                 }}
                 style={{
                   backgroundColor: dieType === 'd6' ? UI_CONFIG.buttonPrimary : UI_CONFIG.inputBackground,
@@ -574,7 +556,6 @@ const DiceRoller = forwardRef<DiceRollerHandle, DiceRollerProps>(({
               <button 
                 onClick={() => {
                   setDieType('d8');
-                  setTargetResult(null);
                 }}
                 style={{
                   backgroundColor: dieType === 'd8' ? UI_CONFIG.buttonPrimary : UI_CONFIG.inputBackground,
@@ -589,7 +570,6 @@ const DiceRoller = forwardRef<DiceRollerHandle, DiceRollerProps>(({
               <button 
                 onClick={() => {
                   setDieType('d20');
-                  setTargetResult(null);
                 }}
                 style={{
                   backgroundColor: dieType === 'd20' ? UI_CONFIG.buttonPrimary : UI_CONFIG.inputBackground,
@@ -604,39 +584,6 @@ const DiceRoller = forwardRef<DiceRollerHandle, DiceRollerProps>(({
             </div>
           </div>
           
-          <div>
-            <div style={{ color: UI_CONFIG.controlsText, fontWeight: 'bold' }}>Predetermined Result:</div>
-            <div style={{ display: "flex", gap: "10px", marginTop: "5px", flexWrap: "wrap" }}>
-              <button 
-                onClick={() => setTargetResult(null)}
-                style={{
-                  backgroundColor: targetResult === null ? UI_CONFIG.buttonPrimary : UI_CONFIG.inputBackground,
-                  color: targetResult === null ? 'white' : 'black',
-                  border: `1px solid ${UI_CONFIG.inputBorder}`,
-                  padding: '5px 10px',
-                  cursor: 'pointer'
-                }}
-              >
-                Random
-              </button>
-              {Array.from({ length: dieType === 'd6' ? 6 : dieType === 'd8' ? 8 : 20 }, (_, i) => i + 1).map(num => (
-                <button 
-                  key={num}
-                  onClick={() => setTargetResult(num)}
-                  style={{
-                    backgroundColor: targetResult === num ? UI_CONFIG.buttonPrimary : UI_CONFIG.inputBackground,
-                    color: targetResult === num ? 'white' : 'black',
-                    border: `1px solid ${UI_CONFIG.inputBorder}`,
-                    padding: '5px 10px',
-                    cursor: 'pointer',
-                    minWidth: '35px'
-                  }}
-                >
-                  {num}
-                </button>
-              ))}
-            </div>
-          </div>
         </div>
         
         <div className={styles.controlsSection}>

@@ -6,11 +6,11 @@ A React 3D dice roller component with realistic physics simulation and predeterm
 
 - 🎲 Multiple dice types: D6, D8, D20
 - 🎨 Customizable colors for dice and numbers
-- 🎯 Predetermined results - force specific outcomes
+- 🎯 Predetermined results - force specific outcomes with imperative API
 - ⚡ Realistic physics with Three.js and Cannon-ES
 - 🎮 Optional physics controls panel
 - 📱 Responsive design
-- 🎯 External control via ref API - trigger rolls programmatically
+- 🚀 Clean imperative API - no prop synchronization issues
 
 ## Installation
 
@@ -24,122 +24,142 @@ pnpm add github:JonasHildershavn/dice-roller-react
 yarn add github:JonasHildershavn/dice-roller-react
 ```
 
-## Basic Usage
-
-```tsx
-import { DiceRoller } from 'dice-roller-react'
-import 'dice-roller-react/dist/style.css'
-
-function App() {
-  const handleResult = (result: number) => {
-    console.log('Rolled:', result)
-  }
-
-  return (
-    <DiceRoller 
-      onResult={handleResult}
-    />
-  )
-}
-```
-
-## Props
-
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `diceColor` | `string` | `'#4a90e2'` | Color of the dice body |
-| `numberColor` | `string` | `'#ffffff'` | Color of the numbers on dice |
-| `dieType` | `'d6' \| 'd8' \| 'd20'` | `'d6'` | Type of die to use |
-| `predeterminedResult` | `number \| null` | `null` | Force a specific result |
-| `width` | `number` | `600` | Width of the component |
-| `height` | `number` | `400` | Height of the component |
-| `dieSize` | `number` | `1` | Size multiplier for the die |
-| `onResult` | `(result: number) => void` | - | Callback when roll completes |
-| `onRollStart` | `() => void` | - | Callback when roll starts |
-| `onRollEnd` | `() => void` | - | Callback when roll ends |
-| `showControls` | `boolean` | `false` | Show physics controls panel |
-| `showResultDisplay` | `boolean` | `true` | Show result display overlay |
-| `throwForce` | `number` | `1.0` | Multiplier for throw force |
-| `autoRoll` | `boolean` | `true` | Auto-roll on mount/click. Set to `false` for external control |
-
-## Advanced Example
-
-```tsx
-import { useState } from 'react'
-import { DiceRoller, DieType } from 'dice-roller-react'
-import 'dice-roller-react/dist/style.css'
-
-function DiceGame() {
-  const [targetNumber] = useState(20)
-  const [attempts, setAttempts] = useState(0)
-  
-  return (
-    <div>
-      <h2>Roll a Natural 20!</h2>
-      <p>Attempts: {attempts}</p>
-      
-      <DiceRoller
-        dieType="d20"
-        diceColor="#ff0000"
-        numberColor="#ffd700"
-        predeterminedResult={attempts > 5 ? 20 : null} // Help after 5 tries
-        onResult={(result) => {
-          setAttempts(a => a + 1)
-          if (result === 20) {
-            alert('Natural 20!')
-          }
-        }}
-        showControls={false}
-        throwForce={1.5}
-      />
-    </div>
-  )
-}
-```
-
-## External Control Example
+## Quick Start
 
 ```tsx
 import { useRef } from 'react'
 import { DiceRoller, DiceRollerHandle } from 'dice-roller-react'
 import 'dice-roller-react/dist/style.css'
 
-function DnDSkillCheck() {
+function App() {
   const diceRef = useRef<DiceRollerHandle>(null)
-  const [dc] = useState(15) // Difficulty Class
-  const [result, setResult] = useState<number | null>(null)
   
-  const attemptSkillCheck = async () => {
-    // Calculate result on backend (example)
-    const response = await fetch('/api/roll-skill-check').then(r => r.json())
-    setResult(response.roll) // Set the predetermined result
+  const rollDice = () => {
+    // Roll with random result
+    diceRef.current?.roll()
     
-    // Trigger dice animation with predetermined result
-    if (diceRef.current) {
-      diceRef.current.roll()
-    }
+    // Or roll with predetermined result
+    diceRef.current?.roll(15)
+  }
+
+  return (
+    <>
+      <button onClick={rollDice}>Roll Dice</button>
+      <DiceRoller 
+        ref={diceRef}
+        onRollComplete={(result) => {
+          console.log('Rolled:', result)
+        }}
+      />
+    </>
+  )
+}
+```
+
+## API Reference
+
+### Props
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `diceColor` | `string` | `'#4a90e2'` | Color of the dice body |
+| `numberColor` | `string` | `'#ffffff'` | Color of the numbers on dice |
+| `dieType` | `'d6' \| 'd8' \| 'd20'` | `'d6'` | Type of die to use |
+| `width` | `number` | `600` | Width of the component |
+| `height` | `number` | `400` | Height of the component |
+| `dieSize` | `number` | `1` | Size multiplier for the die |
+| `onRollComplete` | `(result: number) => void` | - | Called when roll animation completes |
+| `onRollStart` | `() => void` | - | Called when roll starts |
+| `showControls` | `boolean` | `false` | Show physics controls panel |
+| `showResultDisplay` | `boolean` | `true` | Show result display overlay |
+| `throwForce` | `number` | `1.0` | Multiplier for throw force |
+
+### Ref Methods
+
+| Method | Type | Description |
+|--------|------|-------------|
+| `roll` | `(predeterminedResult?: number) => void` | Trigger a dice roll. Pass a number to force that result, or omit for random. |
+
+## Real-World Example: Skill Check
+
+```tsx
+import { useRef, useState } from 'react'
+import { DiceRoller, DiceRollerHandle } from 'dice-roller-react'
+import 'dice-roller-react/dist/style.css'
+
+function SkillCheckComponent() {
+  const diceRef = useRef<DiceRollerHandle>(null)
+  
+  const handleAttemptSkillCheck = async () => {
+    // Get modifier from user
+    const modifier = prompt('Enter your modifier:')
+    
+    // Call backend API
+    const response = await fetch('/api/skill-check-attempts', {
+      method: 'POST',
+      body: JSON.stringify({ skillCheckGroup, modifier })
+    })
+    const data = await response.json()
+    
+    // Pass the result directly to the roll method
+    diceRef.current?.roll(data.result.diceRoll)
   }
   
   return (
-    <div>
-      {/* Full screen dice overlay */}
-      <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none' }}>
-        <DiceRoller
-          ref={diceRef}
-          dieType="d20"
-          autoRoll={false} // Don't auto-roll on mount
-          predeterminedResult={result}
-          width={window.innerWidth}
-          height={window.innerHeight}
-          onResult={(value) => {
-            console.log(`Rolled ${value} vs DC ${dc}`)
-          }}
-          showResultDisplay={false}
-        />
-      </div>
+    <>
+      <button onClick={handleAttemptSkillCheck}>
+        Attempt Skill Check
+      </button>
       
-      {/* Your game UI */}
-      <button onClick={attemptSkillCheck}>Attempt Skill Check</button>
+      <DiceRoller
+        ref={diceRef}
+        dieType="d20"
+        onRollComplete={(result) => {
+          alert(`You rolled ${result}!`)
+        }}
+      />
+    </>
+  )
+}
+```
+
+## Why This API?
+
+The imperative API design eliminates common issues with React prop synchronization:
+
+1. **No race conditions**: Results are passed directly when rolling, not through props
+2. **No state synchronization issues**: The component doesn't track predetermined results
+3. **Cleaner code**: More intuitive usage pattern
+4. **Better performance**: Fewer re-renders
+
+## Visual Customization Example
+
+```tsx
+import { useRef } from 'react'
+import { DiceRoller, DiceRollerHandle } from 'dice-roller-react'
+import 'dice-roller-react/dist/style.css'
+
+function CustomDice() {
+  const diceRef = useRef<DiceRollerHandle>(null)
+  
+  return (
+    <div>
+      <button onClick={() => diceRef.current?.roll()}>Roll D20</button>
+      <button onClick={() => diceRef.current?.roll(20)}>Roll Natural 20!</button>
+      
+      <DiceRoller
+        ref={diceRef}
+        dieType="d20"
+        diceColor="#ff0000"      // Red dice
+        numberColor="#ffd700"     // Gold numbers
+        showControls={true}       // Show physics controls
+        throwForce={1.5}          // Stronger throws
+        onRollComplete={(result) => {
+          if (result === 20) {
+            confetti() // Celebrate!
+          }
+        }}
+      />
     </div>
   )
 }

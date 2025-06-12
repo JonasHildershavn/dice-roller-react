@@ -14,7 +14,6 @@ export interface DiceRollerProps {
   
   // Die configuration
   dieType?: DieType;          // Default: 'd6'
-  predeterminedResult?: number | null;     // Optional: force specific result
   
   // Size and display
   width?: number;             // Default: 600
@@ -22,20 +21,18 @@ export interface DiceRollerProps {
   dieSize?: number;           // Default: 1
   
   // Callbacks
-  onResult?: (result: number) => void;
+  onRollComplete?: (result: number) => void;
   onRollStart?: () => void;
-  onRollEnd?: () => void;
   
   // Optional features
   showControls?: boolean;     // Default: false - hide physics controls
   showResultDisplay?: boolean; // Default: true - show last result
   throwForce?: number;        // Default: 1.0 - multiplier for throw force
-  autoRoll?: boolean;         // Default: true - automatically roll on mount/click
 }
 
 // Ref handle for imperative control
 export interface DiceRollerHandle {
-  roll: () => void;
+  roll: (predeterminedResult?: number) => void;
 }
 
 // ==================== Dice Types ====================

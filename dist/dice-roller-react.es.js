@@ -2013,27 +2013,6 @@ function createDieBody(dieType, dieSize, diceMaterial, physicsParams) {
   }
   return dieBody;
 }
-function generateThrowParams(throwForce = THROW_CONFIG.defaultForce) {
-  const force = Math.max(THROW_CONFIG.minForce, Math.min(THROW_CONFIG.maxForce, throwForce));
-  return {
-    position: THROW_CONFIG.startPosition,
-    rotation: [
-      Math.random() * Math.PI * 2,
-      Math.random() * Math.PI * 2,
-      Math.random() * Math.PI * 2
-    ],
-    velocity: [
-      (Math.random() - 0.5) * THROW_CONFIG.velocityScale * force,
-      THROW_CONFIG.velocityScale * force,
-      (Math.random() - 0.5) * THROW_CONFIG.velocityScale * force
-    ],
-    angularVelocity: [
-      (Math.random() - 0.5) * THROW_CONFIG.angularVelocityScale * force,
-      (Math.random() - 0.5) * THROW_CONFIG.angularVelocityScale * force,
-      (Math.random() - 0.5) * THROW_CONFIG.angularVelocityScale * force
-    ]
-  };
-}
 function generateBottomRightThrowParams(throwForce = THROW_CONFIG.defaultForce) {
   const force = Math.max(THROW_CONFIG.minForce, Math.min(THROW_CONFIG.maxForce, throwForce));
   return {
@@ -2336,20 +2315,17 @@ const DiceRoller = forwardRef(({
   numberColor = "#ffffff",
   // Die configuration
   dieType: propDieType = "d6",
-  predeterminedResult = null,
   // Size and display
   width = 600,
   height = 400,
   dieSize = 1,
   // Callbacks
-  onResult,
+  onRollComplete,
   onRollStart,
-  onRollEnd,
   // Optional features
   showControls = false,
   showResultDisplay = true,
-  throwForce: propThrowForce = 1,
-  autoRoll = true
+  throwForce: propThrowForce = 1
 }, ref) => {
   const mountRef = useRef(null);
   const sceneRef = useRef(null);
@@ -2365,7 +2341,6 @@ const DiceRoller = forwardRef(({
   const currentFaceMappingRef = useRef([]);
   const diceMaterialRef = useRef(null);
   const [lastResult, setLastResult] = useState(null);
-  const [targetResult, setTargetResult] = useState(predeterminedResult ?? null);
   const [dieType, setDieType] = useState(propDieType);
   const [isRolling, setIsRolling] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
@@ -2377,9 +2352,7 @@ const DiceRoller = forwardRef(({
   const [diceSpawned, setDiceSpawned] = useState(false);
   const stoppedFramesRef = useRef(0);
   const physicsParamsRef = useRef(physicsParams);
-  useEffect(() => {
-    setTargetResult(predeterminedResult);
-  }, [predeterminedResult]);
+  const targetResultRef = useRef(null);
   useEffect(() => {
     setDieType(propDieType);
   }, [propDieType]);
@@ -2454,18 +2427,7 @@ const DiceRoller = forwardRef(({
     mesh.receiveShadow = true;
     dieMeshRef.current = mesh;
     dieBodyRef.current = dieBody;
-    if (autoRoll) {
-      sceneRef.current.add(mesh);
-      dieBody.position.set(...THROW_CONFIG.startPosition);
-      dieBody.quaternion.setFromEuler(
-        Math.random() * Math.PI,
-        Math.random() * Math.PI,
-        Math.random() * Math.PI
-      );
-      worldRef.current.addBody(dieBody);
-      setDiceSpawned(true);
-    }
-  }, [dieType, dieSize, internalDiceColor, internalNumberColor, autoRoll]);
+  }, [dieType, dieSize, internalDiceColor, internalNumberColor]);
   const detectFaceValue = useCallback(() => {
     if (!dieMeshRef.current) return -1;
     return detectMeshFaceValue(
@@ -2474,7 +2436,7 @@ const DiceRoller = forwardRef(({
       currentFaceMappingRef.current
     );
   }, [dieType]);
-  const throwDie = useCallback(() => {
+  const throwDie = useCallback((predeterminedResult) => {
     if (!dieBodyRef.current || !dieMeshRef.current || isRolling || !sceneRef.current || !worldRef.current) return;
     if (!diceSpawned) {
       sceneRef.current.add(dieMeshRef.current);
@@ -2484,8 +2446,9 @@ const DiceRoller = forwardRef(({
     setIsRolling(true);
     stoppedFramesRef.current = 0;
     if (onRollStart) onRollStart();
-    const params = !autoRoll || !diceSpawned ? generateBottomRightThrowParams(throwForce) : generateThrowParams(throwForce);
-    const desiredResult = targetResult;
+    targetResultRef.current = predeterminedResult ?? null;
+    const params = generateBottomRightThrowParams(throwForce);
+    const desiredResult = predeterminedResult;
     const maxValue = DICE_CONFIGS[dieType].faces;
     if (desiredResult && desiredResult >= 1 && desiredResult <= maxValue) {
       const predictedResult = simulateThrow(params, dieSize, dieType, physicsParamsRef.current);
@@ -2521,9 +2484,9 @@ const DiceRoller = forwardRef(({
     dieBodyRef.current.quaternion.setFromEuler(...params.rotation);
     dieBodyRef.current.velocity.set(...params.velocity);
     dieBodyRef.current.angularVelocity.set(...params.angularVelocity);
-  }, [isRolling, targetResult, dieType, dieSize, throwForce, onRollStart, diceSpawned, autoRoll]);
+  }, [isRolling, dieType, dieSize, throwForce, onRollStart, diceSpawned]);
   useImperativeHandle(ref, () => ({
-    roll: throwDie
+    roll: (predeterminedResult) => throwDie(predeterminedResult)
   }), [throwDie]);
   const animate = useCallback(() => {
     if (!sceneRef.current || !rendererRef.current || !cameraRef.current || !worldRef.current) return;
@@ -2561,9 +2524,8 @@ const DiceRoller = forwardRef(({
               const result = detectFaceValue();
               if (result > 0) {
                 setLastResult(result);
-                if (onResult) onResult(result);
+                if (onRollComplete) onRollComplete(result);
               }
-              if (onRollEnd) onRollEnd();
             }, ANIMATION_CONFIG.resultDelay);
           }
         } else {
@@ -2576,7 +2538,7 @@ const DiceRoller = forwardRef(({
     }
     rendererRef.current.render(sceneRef.current, cameraRef.current);
     frameRef.current = requestAnimationFrame(animate);
-  }, [isRolling, detectFaceValue, onResult, onRollEnd, dieType]);
+  }, [isRolling, detectFaceValue, onRollComplete, dieType]);
   useEffect(() => {
     initScene();
     return () => {
@@ -2676,12 +2638,11 @@ const DiceRoller = forwardRef(({
         "div",
         {
           ref: mountRef,
-          style: { width: "100%", height: "100%", cursor: "pointer" },
-          onClick: autoRoll ? throwDie : void 0
+          style: { width: "100%", height: "100%" }
         }
       ),
       showResultDisplay && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { position: "absolute", bottom: 20, left: 20, color: "black" }, children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { children: autoRoll ? "Click anywhere to roll the die!" : "Waiting for roll..." }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { children: diceSpawned ? "Ready to roll!" : "Use roll() to start" }),
         lastResult && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { fontSize: "24px", marginTop: "10px" }, children: [
           "Last roll: ",
           lastResult
@@ -2727,7 +2688,6 @@ const DiceRoller = forwardRef(({
               {
                 onClick: () => {
                   setDieType("d6");
-                  setTargetResult(null);
                 },
                 style: {
                   backgroundColor: dieType === "d6" ? UI_CONFIG.buttonPrimary : UI_CONFIG.inputBackground,
@@ -2744,7 +2704,6 @@ const DiceRoller = forwardRef(({
               {
                 onClick: () => {
                   setDieType("d8");
-                  setTargetResult(null);
                 },
                 style: {
                   backgroundColor: dieType === "d8" ? UI_CONFIG.buttonPrimary : UI_CONFIG.inputBackground,
@@ -2761,7 +2720,6 @@ const DiceRoller = forwardRef(({
               {
                 onClick: () => {
                   setDieType("d20");
-                  setTargetResult(null);
                 },
                 style: {
                   backgroundColor: dieType === "d20" ? UI_CONFIG.buttonPrimary : UI_CONFIG.inputBackground,
@@ -2773,41 +2731,6 @@ const DiceRoller = forwardRef(({
                 children: "D20"
               }
             )
-          ] })
-        ] }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { style: { color: UI_CONFIG.controlsText, fontWeight: "bold" }, children: "Predetermined Result:" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { style: { display: "flex", gap: "10px", marginTop: "5px", flexWrap: "wrap" }, children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx(
-              "button",
-              {
-                onClick: () => setTargetResult(null),
-                style: {
-                  backgroundColor: targetResult === null ? UI_CONFIG.buttonPrimary : UI_CONFIG.inputBackground,
-                  color: targetResult === null ? "white" : "black",
-                  border: `1px solid ${UI_CONFIG.inputBorder}`,
-                  padding: "5px 10px",
-                  cursor: "pointer"
-                },
-                children: "Random"
-              }
-            ),
-            Array.from({ length: dieType === "d6" ? 6 : dieType === "d8" ? 8 : 20 }, (_, i) => i + 1).map((num) => /* @__PURE__ */ jsxRuntimeExports.jsx(
-              "button",
-              {
-                onClick: () => setTargetResult(num),
-                style: {
-                  backgroundColor: targetResult === num ? UI_CONFIG.buttonPrimary : UI_CONFIG.inputBackground,
-                  color: targetResult === num ? "white" : "black",
-                  border: `1px solid ${UI_CONFIG.inputBorder}`,
-                  padding: "5px 10px",
-                  cursor: "pointer",
-                  minWidth: "35px"
-                },
-                children: num
-              },
-              num
-            ))
           ] })
         ] })
       ] }),
